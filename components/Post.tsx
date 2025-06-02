@@ -2,8 +2,9 @@ import { COLORS } from "@/constants/theme";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { styles } from "@/styles/feed.styles";
+import { useUser } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { formatDistanceToNow } from "date-fns";
 import { Image } from "expo-image";
 import { Link } from "expo-router";
@@ -31,11 +32,18 @@ type PostProps = {
 
 export default function Post({ post }: PostProps) {
   const [isLiked, setIsLiked] = useState(post.isLiked);
+  const [isBookmarked, setIsBookmarked] = useState(post.isBookmarked);
   const [likesCount, setLikesCount] = useState(post.likes);
   const [commentsCount, setCommentsCount] = useState(post.comments);
   const [showComments, setShowComments] = useState(false);
 
+  const { user } = useUser();
+
+  const currentUser = useQuery(api.users.getUserByClerkId, user ? { clerkId: user.id } : "skip");
+
   const toggleLikeMutation = useMutation(api.posts.toggleLike);
+  const toggleBookmarkMutation = useMutation(api.bookmarks.toggleBookmark);
+  const deletePostMutation = useMutation(api.posts.deletePost);
 
   const handleLike = async () => {
     try {
@@ -45,6 +53,15 @@ export default function Post({ post }: PostProps) {
     } catch (error) {
       console.error("Error toggling like:", error);
     }
+  };
+
+  const handleBookmark = async () => {
+    await toggleBookmarkMutation({ postId: post._id });
+    setIsBookmarked(!isBookmarked);
+  };
+
+  const handleDeletePost = async () => {
+    await deletePostMutation({ postId: post._id });
   };
 
   return (
@@ -64,13 +81,16 @@ export default function Post({ post }: PostProps) {
           </TouchableOpacity>
         </Link>
 
-        {/*<TouchableOpacity>
-          <Ionicons name="ellipsis-horizontal" size={20} color={COLORS.white} />
-        </TouchableOpacity>*/}
-
-        <TouchableOpacity>
-          <Ionicons name="trash-outline" size={20} color={COLORS.primary} />
-        </TouchableOpacity>
+        {/* if i'm the owner of the post, show the delete button */}
+        {post.author._id === currentUser?._id ? (
+          <TouchableOpacity onPress={handleDeletePost}>
+            <Ionicons name="trash-outline" size={20} color={COLORS.primary} />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity>
+            <Ionicons name="ellipsis-horizontal" size={20} color={COLORS.white} />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* POST IMAGE */}
@@ -95,8 +115,12 @@ export default function Post({ post }: PostProps) {
           <TouchableOpacity onPress={() => setShowComments(true)}>
             <Ionicons name="chatbubble-outline" size={22} color={COLORS.white} />
           </TouchableOpacity>
-          <TouchableOpacity>
-            <Ionicons name="bookmark-outline" size={22} color={COLORS.white} />
+          <TouchableOpacity onPress={handleBookmark}>
+            <Ionicons
+              name={isBookmarked ? "bookmark" : "bookmark-outline"}
+              size={22}
+              color={isBookmarked ? COLORS.primary : COLORS.white}
+            />
           </TouchableOpacity>
         </View>
       </View>
