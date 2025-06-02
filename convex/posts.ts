@@ -165,6 +165,14 @@ export const deletePost = mutation({
 
     await Promise.all(bookmarks.map((bookmark) => ctx.db.delete(bookmark._id)));
 
+    // delete associated notifications
+    const notifications = await ctx.db
+      .query("notifications")
+      .withIndex("by_post", (q) => q.eq("postId", args.postId))
+      .collect();
+
+    await Promise.all(notifications.map((notification) => ctx.db.delete(notification._id)));
+
     // delete the storage file
     await ctx.storage.delete(post.storageId);
 
